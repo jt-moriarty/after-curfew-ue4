@@ -8,25 +8,30 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "Engine/GameEngine.h"
+#include "Engine/Public/DrawDebugHelpers.h"
 
 const FName AAfterCurfewPawn::MoveForwardBinding("MoveForward");
 const FName AAfterCurfewPawn::MoveRightBinding("MoveRight");
-const FName AAfterCurfewPawn::FireForwardBinding("FireForward");
-const FName AAfterCurfewPawn::FireRightBinding("FireRight");
+const FName AAfterCurfewPawn::AimForwardBinding("AimForward");
+const FName AAfterCurfewPawn::AimRightBinding("AimRight");
+const FName AAfterCurfewPawn::LiftUpBinding("LiftUp");
+const FName AAfterCurfewPawn::FireBinding("Fire");
 
 AAfterCurfewPawn::AAfterCurfewPawn()
-{	
+{
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/TwinStick/Meshes/TwinStickUFO.TwinStickUFO"));
 	// Create the mesh component
 	ShipMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipMesh"));
 	RootComponent = ShipMeshComponent;
 	ShipMeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
-	
+
 	// Cache our sound effect
 	static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/TwinStick/Audio/TwinStickFire.TwinStickFire"));
 	FireSound = FireAudio.Object;
@@ -46,10 +51,13 @@ AAfterCurfewPawn::AAfterCurfewPawn()
 
 	// Movement
 	MoveSpeed = 1000.0f;
+
 	// Weapon
 	GunOffset = FVector(90.f, 0.f, 0.f);
 	FireRate = 0.1f;
+	FireSpread = 2.5f;
 	bCanFire = true;
+	bFire = false;
 }
 
 void AAfterCurfewPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -59,44 +67,114 @@ void AAfterCurfewPawn::SetupPlayerInputComponent(class UInputComponent* PlayerIn
 	// set up gameplay key bindings
 	PlayerInputComponent->BindAxis(MoveForwardBinding);
 	PlayerInputComponent->BindAxis(MoveRightBinding);
-	PlayerInputComponent->BindAxis(FireForwardBinding);
-	PlayerInputComponent->BindAxis(FireRightBinding);
+	PlayerInputComponent->BindAxis(AimForwardBinding);
+	PlayerInputComponent->BindAxis(AimRightBinding);
+	PlayerInputComponent->BindAxis(LiftUpBinding);
+	PlayerInputComponent->BindAction(FireBinding, IE_Pressed, this, &AAfterCurfewPawn::StartFiring);
+	PlayerInputComponent->BindAction(FireBinding, IE_Released, this, &AAfterCurfewPawn::StopFiring);
+}
+
+void AAfterCurfewPawn::StartFiring()
+{
+	bFire = 1;
+}
+
+void AAfterCurfewPawn::StopFiring()
+{
+	bFire = 0;
 }
 
 void AAfterCurfewPawn::Tick(float DeltaSeconds)
 {
-	// Find movement direction
+	//TODO: bounds objects created and placed via code?
+
+	//TODO: add some recoil on firing shots?
+	//TODO: support better controller version of aiming in addition to the mouse.
+	//TODO: add a custom cursor sprite instead of the default crosshair.
+
+	//TODO: movement needs acceleration / velocity, feeling of weight.
+	//TODO: handle rotation collision (if necessary).
+	//TODO: use virtual void PlayerController::AddPitchInput(float Val) and virtual void PlayerController::AddYawInput(float Val) for rotations?
+	//TODO: turning to face the recticle should not be immediate, there should be turning speed.
+	//TODO: Add minor ship rotations on heavy turns to improve the feeling of weight.
+
+	APlayerController * Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	
+	FVector CurrentLocation = this->GetActorLocation();
+
+	FHitResult TraceHitResult;
+	Controller->GetHitResultUnderCursor(ECC_Camera, true, TraceHitResult);
+	DrawDebugLine(GetWorld(), CurrentLocation, TraceHitResult.Location, FColor::Red, false);
+
+	// Get the aiming direction for the player
+	FVector AimLocation = TraceHitResult.Location;
+	FVector AimDirection = AimLocation - CurrentLocation;
+	AimDirection.Normalize();
+
+	// Find the new facing rotation for the player
+	FRotator PawnRotation = this->GetActorRotation();
+	FRotator TargetRotation = AimDirection.Rotation();
+	const FRotator NewRotation = FRotator(PawnRotation.Pitch, TargetRotation.Yaw, PawnRotation.Roll);
+
+	// Find XY movement directions
 	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
 	const float RightValue = GetInputAxisValue(MoveRightBinding);
 
 	// Clamp max size so that (X=1, Y=1) doesn't cause faster movement in diagonal directions
-	const FVector MoveDirection = FVector(ForwardValue, RightValue, 0.f).GetClampedToMaxSize(1.0f);
+	const FVector XYMoveDirection = FVector(ForwardValue, RightValue, 0).GetClampedToMaxSize(1.0f);
 
 	// Calculate  movement
-	const FVector Movement = MoveDirection * MoveSpeed * DeltaSeconds;
+	const FVector XYMovement = XYMoveDirection * MoveSpeed * DeltaSeconds;
 
 	// If non-zero size, move this actor
-	if (Movement.SizeSquared() > 0.0f)
+	if (XYMovement.SizeSquared() > 0.0f)
 	{
-		const FRotator NewRotation = Movement.Rotation();
 		FHitResult Hit(1.f);
-		RootComponent->MoveComponent(Movement, NewRotation, true, &Hit);
-		
+
+		RootComponent->MoveComponent(XYMovement, NewRotation, true, &Hit);
+
 		if (Hit.IsValidBlockingHit())
 		{
 			const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
-			const FVector Deflection = FVector::VectorPlaneProject(Movement, Normal2D) * (1.f - Hit.Time);
+			const FVector Deflection = FVector::VectorPlaneProject(XYMovement, Normal2D) * (1.f - Hit.Time);
 			RootComponent->MoveComponent(Deflection, NewRotation, true);
 		}
 	}
-	
-	// Create fire direction vector
-	const float FireForwardValue = GetInputAxisValue(FireForwardBinding);
-	const float FireRightValue = GetInputAxisValue(FireRightBinding);
-	const FVector FireDirection = FVector(FireForwardValue, FireRightValue, 0.f);
+	// If no XY movement, still turn to face the aim direction
+	else
+	{
+		RootComponent->SetWorldRotation(NewRotation);
+	}
 
-	// Try and fire a shot
-	FireShot(FireDirection);
+	// Handle lift movement
+	const float UpValue = GetInputAxisValue(LiftUpBinding);
+	const FVector ZMoveDirection = FVector(0, 0, UpValue).GetClampedToMaxSize(1.0f);
+	const FVector ZMovement = ZMoveDirection * MoveSpeed * DeltaSeconds;
+
+	if (ZMovement.SizeSquared() > 0.0f)
+	{
+		FHitResult Hit(1.f);
+
+		FRotator CurrentRotation = this->GetActorRotation();
+
+		RootComponent->MoveComponent(ZMovement, CurrentRotation, true, &Hit);
+
+		if (Hit.IsValidBlockingHit())
+		{
+			const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
+			const FVector Deflection = FVector::VectorPlaneProject(ZMovement, Normal2D) * (1.f - Hit.Time);
+			RootComponent->MoveComponent(Deflection, CurrentRotation, true);
+		}
+	}
+
+	// Create fire direction vector
+	const FVector FireDirection = FVector(AimDirection.X, AimDirection.Y, 0.f);
+
+	// Try and fire a shot if fire button is being held down
+	if (bFire == true)
+	{
+		FireShot(FireDirection);
+	}
 }
 
 void AAfterCurfewPawn::FireShot(FVector FireDirection)
@@ -107,7 +185,9 @@ void AAfterCurfewPawn::FireShot(FVector FireDirection)
 		// If we are pressing fire stick in a direction
 		if (FireDirection.SizeSquared() > 0.0f)
 		{
-			const FRotator FireRotation = FireDirection.Rotation();
+			// Add slight variance for better looking bullet spread.
+			const FRotator FireRotation = FireDirection.Rotation().Add(0, FMath::FRandRange(-FireSpread, FireSpread), 0);
+
 			// Spawn projectile at an offset from this pawn
 			const FVector SpawnLocation = GetActorLocation() + FireRotation.RotateVector(GunOffset);
 

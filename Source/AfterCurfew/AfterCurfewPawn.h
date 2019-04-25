@@ -27,12 +27,16 @@ public:
 	AAfterCurfewPawn();
 
 	/** Offset from the ships location to spawn projectiles */
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
 	FVector GunOffset;
-	
+
 	/* How fast the weapon will fire */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
 	float FireRate;
+
+	/* The maximum spread of the bullets */
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
+	float FireSpread;
 
 	/* The speed our ship moves around the level */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
@@ -50,19 +54,28 @@ public:
 	/* Fire a shot in the specified direction */
 	void FireShot(FVector FireDirection);
 
-	/* Handler for the fire timer expiry */
+	/* Handler for the fire timer expiration */
 	void ShotTimerExpired();
+
+	void StartFiring();
+
+	void StopFiring();
 
 	// Static names for axis bindings
 	static const FName MoveForwardBinding;
 	static const FName MoveRightBinding;
-	static const FName FireForwardBinding;
-	static const FName FireRightBinding;
+	static const FName AimForwardBinding;
+	static const FName AimRightBinding;
+	static const FName LiftUpBinding;
+	static const FName FireBinding;
 
 private:
 
 	/* Flag to control firing  */
 	uint32 bCanFire : 1;
+
+	/* Flag to control firing  */
+	uint32 bFire : 1;
 
 	/** Handle for efficient management of ShotTimerExpired timer */
 	FTimerHandle TimerHandle_ShotTimerExpired;
@@ -75,4 +88,3 @@ public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 };
-
