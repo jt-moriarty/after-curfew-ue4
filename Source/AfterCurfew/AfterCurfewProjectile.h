@@ -25,6 +25,9 @@ class AAfterCurfewProjectile : public AActor
 public:
 	AAfterCurfewProjectile();
 
+	/** Initialize different variables for the projectile when spwaning it in code */
+	void Initialize(float NewInitialSpeed, float NewMaxSpeed);
+
 	/** Function to handle the projectile hitting something */
 	UFUNCTION()
 	void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);

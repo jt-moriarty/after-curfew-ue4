@@ -18,6 +18,7 @@ AAfterCurfewProjectile::AAfterCurfewProjectile()
 	ProjectileMesh->SetupAttachment(RootComponent);
 	ProjectileMesh->BodyInstance.SetCollisionProfileName("Projectile");
 	ProjectileMesh->OnComponentHit.AddDynamic(this, &AAfterCurfewProjectile::OnHit);		// set up a notification for when this component hits something
+	
 	RootComponent = ProjectileMesh;
 
 	// Use a ProjectileMovementComponent to govern this projectile's movement
@@ -31,6 +32,12 @@ AAfterCurfewProjectile::AAfterCurfewProjectile()
 
 	// Die after 3 seconds by default
 	InitialLifeSpan = 3.0f;
+}
+
+void AAfterCurfewProjectile::Initialize(float NewInitialSpeed, float NewMaxSpeed)
+{
+	GetProjectileMovement()->InitialSpeed = NewInitialSpeed;
+	GetProjectileMovement()->MaxSpeed = NewMaxSpeed;
 }
 
 void AAfterCurfewProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)

@@ -31,12 +31,24 @@ public:
 	FVector GunOffset;
 
 	/* How fast the weapon will fire */
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(Category = Weapons, EditAnywhere, BlueprintReadWrite)
 	float FireRate;
 
 	/* The maximum spread of the bullets */
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(Category = Weapons, EditAnywhere, BlueprintReadWrite)
 	float FireSpread;
+
+	/* The scale of the bullets */
+	UPROPERTY(Category = Weapons, EditAnywhere, BlueprintReadWrite)
+	float ProjectileScale;
+
+	/* The initial speed of the bullets */
+	UPROPERTY(Category = Weapons, EditAnywhere, BlueprintReadWrite)
+	float ProjectileInitialSpeed;
+
+	/* The max speed of the bullets */
+	UPROPERTY(Category = Weapons, EditAnywhere, BlueprintReadWrite)
+	float ProjectileMaxSpeed;
 
 	/* The speed our ship moves around the level */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)

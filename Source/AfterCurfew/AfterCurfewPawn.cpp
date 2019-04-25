@@ -15,6 +15,7 @@
 #include "Sound/SoundBase.h"
 #include "Engine/GameEngine.h"
 #include "Engine/Public/DrawDebugHelpers.h"
+#include "Macros.h"
 
 const FName AAfterCurfewPawn::MoveForwardBinding("MoveForward");
 const FName AAfterCurfewPawn::MoveRightBinding("MoveRight");
@@ -56,6 +57,9 @@ AAfterCurfewPawn::AAfterCurfewPawn()
 	GunOffset = FVector(90.f, 0.f, 0.f);
 	FireRate = 0.1f;
 	FireSpread = 2.5f;
+	ProjectileScale = 1.f;
+	ProjectileInitialSpeed = 3000.f;
+	ProjectileMaxSpeed = 3000.f;
 	bCanFire = true;
 	bFire = false;
 }
@@ -92,14 +96,14 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	//TODO: support better controller version of aiming in addition to the mouse.
 	//TODO: add a custom cursor sprite instead of the default crosshair.
 
-	//TODO: movement needs acceleration / velocity, feeling of weight.
+	//TODO: movement and rotation needs acceleration / velocity, feeling of weight.
 	//TODO: handle rotation collision (if necessary).
 	//TODO: use virtual void PlayerController::AddPitchInput(float Val) and virtual void PlayerController::AddYawInput(float Val) for rotations?
 	//TODO: turning to face the recticle should not be immediate, there should be turning speed.
 	//TODO: Add minor ship rotations on heavy turns to improve the feeling of weight.
 
 	APlayerController * Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	
+
 	FVector CurrentLocation = this->GetActorLocation();
 
 	FHitResult TraceHitResult;
@@ -114,7 +118,19 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	// Find the new facing rotation for the player
 	FRotator PawnRotation = this->GetActorRotation();
 	FRotator TargetRotation = AimDirection.Rotation();
-	const FRotator NewRotation = FRotator(PawnRotation.Pitch, TargetRotation.Yaw, PawnRotation.Roll);
+
+	// Turn to face the target rotation by a turn speed amount
+	float NewYaw = FMath::FixedTurn(PawnRotation.Yaw, TargetRotation.Yaw, 300.0f * DeltaSeconds);
+
+	// The goal for this movement is slower start with some acceleration and then a very slight break at the end
+
+	// This could also be done with Lerp, and would maybe be better.
+	//float NewYaw = FMath::Lerp(PawnRotation.Yaw, TargetRotation.Yaw, 0.5f);
+	/*if (!FMath::IsNearlyZero(NewYaw)) {
+		DEBUGMESSAGE("YawDifference: %d", FColor::White, YawDifference);
+	}*/
+
+	const FRotator NewRotation = FRotator(PawnRotation.Pitch, NewYaw, PawnRotation.Roll);
 
 	// Find XY movement directions
 	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
@@ -168,6 +184,10 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	}
 
 	// Create fire direction vector
+	//const FVector FireDirection = FVector(AimDirection.X, AimDirection.Y, 0.f);
+
+	// Fire vector is the forward vector of the ship
+	AimDirection = this->GetActorForwardVector();
 	const FVector FireDirection = FVector(AimDirection.X, AimDirection.Y, 0.f);
 
 	// Try and fire a shot if fire button is being held down
@@ -195,7 +215,13 @@ void AAfterCurfewPawn::FireShot(FVector FireDirection)
 			if (World != NULL)
 			{
 				// spawn the projectile
-				World->SpawnActor<AAfterCurfewProjectile>(SpawnLocation, FireRotation);
+				//World->SpawnActor<AAfterCurfewProjectile>(SpawnLocation, FireRotation);
+
+				FVector Scale = FVector(1.0f);
+				const FTransform SpawnTransform = FTransform(FireRotation, SpawnLocation, Scale * ProjectileScale);
+				AAfterCurfewProjectile* NewProjectile = World->SpawnActorDeferred<AAfterCurfewProjectile>(AAfterCurfewProjectile::StaticClass(), SpawnTransform);
+				NewProjectile->Initialize(ProjectileInitialSpeed, ProjectileMaxSpeed);
+				NewProjectile->FinishSpawning(SpawnTransform);
 			}
 
 			bCanFire = false;
