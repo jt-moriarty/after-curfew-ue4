@@ -22,6 +22,7 @@ const FName AAfterCurfewPawn::MoveRightBinding("MoveRight");
 const FName AAfterCurfewPawn::AimForwardBinding("AimForward");
 const FName AAfterCurfewPawn::AimRightBinding("AimRight");
 const FName AAfterCurfewPawn::LiftUpBinding("LiftUp");
+const FName AAfterCurfewPawn::ThrustBinding("Thrust");
 const FName AAfterCurfewPawn::FireBinding("Fire");
 
 AAfterCurfewPawn::AAfterCurfewPawn()
@@ -51,9 +52,30 @@ AAfterCurfewPawn::AAfterCurfewPawn()
 	CameraComponent->bUsePawnControlRotation = false;	// Camera does not rotate relative to arm
 
 	// Movement
-	MoveSpeed = 1000.0f;
+	//MoveSpeed = 1000.0f;
 
-	// Weapon
+	/*ThrustInterpSpeed = 2.f;
+	ThrustMaxSpeed = 1000.f;
+	ThrustMinSpeed = 0.f;
+	CurrentThrustSpeed = 0.f;*/
+
+	InterpSpeed = 2.f;
+	MaxSpeed = 1000.f;
+	MinSpeed = -1000.f;
+	CurrForwardSpeed = 0.f;
+	CurrRightSpeed = 0.f;
+
+	YawInterpSpeed = 2.f;
+	MaxYawSpeed = 600.f;
+	MinYawSpeed = 0.f;
+	CurrYawSpeed = 0.f;
+
+	LiftInterpSpeed = 2.f;
+	MaxLiftSpeed = 1000.f;
+	MinLiftSpeed = -1000.f;
+	CurrentLiftSpeed = 0.f;
+
+	// Weapons
 	GunOffset = FVector(90.f, 0.f, 0.f);
 	FireRate = 0.1f;
 	FireSpread = 2.5f;
@@ -69,13 +91,79 @@ void AAfterCurfewPawn::SetupPlayerInputComponent(class UInputComponent* PlayerIn
 	check(PlayerInputComponent);
 
 	// set up gameplay key bindings
-	PlayerInputComponent->BindAxis(MoveForwardBinding);
-	PlayerInputComponent->BindAxis(MoveRightBinding);
+	//PlayerInputComponent->BindAxis(MoveForwardBinding);
+	//PlayerInputComponent->BindAxis(MoveRightBinding);
+	//PlayerInputComponent->BindAxis(LiftUpBinding);
+	PlayerInputComponent->BindAxis(MoveForwardBinding, this, &AAfterCurfewPawn::MoveForwardInput);
+	PlayerInputComponent->BindAxis(MoveRightBinding, this, &AAfterCurfewPawn::MoveRightInput);
+	//PlayerInputComponent->BindAxis(ThrustBinding, this, &AAfterCurfewPawn::ThrustInput);
+	PlayerInputComponent->BindAxis(LiftUpBinding, this, &AAfterCurfewPawn::LiftUpInput);
 	PlayerInputComponent->BindAxis(AimForwardBinding);
 	PlayerInputComponent->BindAxis(AimRightBinding);
-	PlayerInputComponent->BindAxis(LiftUpBinding);
 	PlayerInputComponent->BindAction(FireBinding, IE_Pressed, this, &AAfterCurfewPawn::StartFiring);
 	PlayerInputComponent->BindAction(FireBinding, IE_Released, this, &AAfterCurfewPawn::StopFiring);
+}
+
+/*void AAfterCurfewPawn::ThrustInput(float Val)
+{
+	// Is there any input?
+	bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
+
+	// Determing target speed based on input
+	float TargetThrustSpeed = bHasInput ? Val * ThrustMaxSpeed : 0.f;
+
+	// Calculate new speed
+	float NewThrustSpeed = FMath::FInterpTo(CurrentThrustSpeed, TargetThrustSpeed, GetWorld()->GetDeltaSeconds(), ThrustInterpSpeed);
+
+	// Clamp between MinSpeed and MaxSpeed
+	CurrentThrustSpeed = FMath::Clamp(NewThrustSpeed, ThrustMinSpeed, ThrustMaxSpeed);
+
+	//DEBUGMESSAGE("Thrust: Val: %f, Target: %f, Current: %f", FColor::Red, Val, TargetThrustSpeed, CurrentThrustSpeed);
+}*/
+
+void AAfterCurfewPawn::MoveForwardInput(float Val)
+{
+	// Is there any input?
+	bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
+
+	// Determing target speed based on input
+	float TargetForwardSpeed = bHasInput ? Val * MaxSpeed : 0.f;
+
+	// Calculate new speed
+	float NewForwardSpeed = FMath::FInterpTo(CurrForwardSpeed, TargetForwardSpeed, GetWorld()->GetDeltaSeconds(), InterpSpeed);
+
+	// Clamp between MinSpeed and MaxSpeed
+	CurrForwardSpeed = FMath::Clamp(NewForwardSpeed, MinSpeed, MaxSpeed);
+}
+
+void AAfterCurfewPawn::MoveRightInput(float Val)
+{
+	// Is there any input?
+	bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
+
+	// Determing target speed based on input
+	float TargetRightSpeed = bHasInput ? Val * MaxSpeed : 0.f;
+
+	// Calculate new speed
+	float NewRightSpeed = FMath::FInterpTo(CurrRightSpeed, TargetRightSpeed, GetWorld()->GetDeltaSeconds(), InterpSpeed);
+
+	// Clamp between MinSpeed and MaxSpeed
+	CurrRightSpeed = FMath::Clamp(NewRightSpeed, MinSpeed, MaxSpeed);
+}
+
+void AAfterCurfewPawn::LiftUpInput(float Val)
+{	
+	// Is there any input?
+	bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
+
+	// Determing target speed based on input
+	float TargetLiftSpeed = bHasInput ? Val * MaxLiftSpeed : 0.f;
+	
+	// Calculate new speed
+	float NewLiftSpeed = FMath::FInterpTo(CurrentLiftSpeed, TargetLiftSpeed, GetWorld()->GetDeltaSeconds(), LiftInterpSpeed);
+
+	// Clamp between MinSpeed and MaxSpeed
+	CurrentLiftSpeed = FMath::Clamp(NewLiftSpeed, MinLiftSpeed, MaxLiftSpeed);
 }
 
 void AAfterCurfewPawn::StartFiring()
@@ -95,12 +183,7 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	//TODO: add some recoil on firing shots?
 	//TODO: support better controller version of aiming in addition to the mouse.
 	//TODO: add a custom cursor sprite instead of the default crosshair.
-
-	//TODO: movement and rotation needs acceleration / velocity, feeling of weight.
-	//TODO: handle rotation collision (if necessary).
-	//TODO: use virtual void PlayerController::AddPitchInput(float Val) and virtual void PlayerController::AddYawInput(float Val) for rotations?
-	//TODO: turning to face the recticle should not be immediate, there should be turning speed.
-	//TODO: Add minor ship rotations on heavy turns to improve the feeling of weight.
+	//TODO: Add minor ship rotations to Pitch / Roll on heavy turns to improve the feeling of weight.
 
 	APlayerController * Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 
@@ -115,32 +198,53 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	FVector AimDirection = AimLocation - CurrentLocation;
 	AimDirection.Normalize();
 
-	// Find the new facing rotation for the player
-	FRotator PawnRotation = this->GetActorRotation();
+	// Get the player's current rotation
+	FRotator CurrentRotation = this->GetActorRotation();
+
+	// Determine target rotation based on input
 	FRotator TargetRotation = AimDirection.Rotation();
 
 	// Turn to face the target rotation by a turn speed amount
-	float NewYaw = FMath::FixedTurn(PawnRotation.Yaw, TargetRotation.Yaw, 300.0f * DeltaSeconds);
 
-	// The goal for this movement is slower start with some acceleration and then a very slight break at the end
+	//DEBUGMESSAGE("Current: %f, Target: %f", FColor::White, CurrentRotation.Yaw, TargetRotation.Yaw);
 
-	// This could also be done with Lerp, and would maybe be better.
-	//float NewYaw = FMath::Lerp(PawnRotation.Yaw, TargetRotation.Yaw, 0.5f);
-	/*if (!FMath::IsNearlyZero(NewYaw)) {
-		DEBUGMESSAGE("YawDifference: %d", FColor::White, YawDifference);
-	}*/
+	/*bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
 
-	const FRotator NewRotation = FRotator(PawnRotation.Pitch, NewYaw, PawnRotation.Roll);
+	// Determing target speed based on input
+	float TargetThrustSpeed = bHasInput ? Val * ThrustMaxSpeed : 0.f;
 
-	// Find XY movement directions
-	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
-	const float RightValue = GetInputAxisValue(MoveRightBinding);
+	// Calculate new speed
+	float NewThrustSpeed = FMath::FInterpTo(CurrentThrustSpeed, TargetThrustSpeed, GetWorld()->GetDeltaSeconds(), ThrustInterpSpeed);
 
-	// Clamp max size so that (X=1, Y=1) doesn't cause faster movement in diagonal directions
-	const FVector XYMoveDirection = FVector(ForwardValue, RightValue, 0).GetClampedToMaxSize(1.0f);
+	// Clamp between MinSpeed and MaxSpeed
+	CurrentThrustSpeed = FMath::Clamp(NewThrustSpeed, ThrustMinSpeed, ThrustMaxSpeed);*/
 
-	// Calculate  movement
-	const FVector XYMovement = XYMoveDirection * MoveSpeed * DeltaSeconds;
+	bool bHasYawInput = !FMath::IsNearlyEqual(CurrentRotation.Yaw, TargetRotation.Yaw, 0.0001f);
+
+	float YawTargetSpeed = bHasYawInput ? MaxYawSpeed : 0.f;
+
+	float YawNewSpeed = FMath::FInterpTo(CurrYawSpeed, YawTargetSpeed, GetWorld()->GetDeltaSeconds(), YawInterpSpeed);
+
+	CurrYawSpeed = FMath::Clamp(YawNewSpeed, MinYawSpeed, MaxYawSpeed);
+
+	//DEBUGMESSAGE("CurrYawSpeed: %f", FColor::White, CurrYawSpeed);
+
+	float NewYaw = FMath::FixedTurn(CurrentRotation.Yaw, TargetRotation.Yaw, CurrYawSpeed * DeltaSeconds);
+	//float NewYaw = FMath::FInterpTo(CurrentRotation.Yaw, TargetRotation.Yaw, GetWorld()->GetDeltaSeconds(), 4.f);
+
+	const FRotator NewRotation = FRotator(CurrentRotation.Pitch, NewYaw, CurrentRotation.Roll);
+
+	// Calculate change in rotation this frame
+	/*FRotator DeltaRotation(0, 0, 0);
+	DeltaRotation.Pitch = 0.f;//CurrentPitchSpeed * DeltaSeconds;
+	DeltaRotation.Yaw = CurrentYawSpeed * DeltaSeconds;
+	DeltaRotation.Roll = 0.f;//CurrentRollSpeed * DeltaSeconds;*/
+
+	// Rotate plane
+	//AddActorLocalRotation(DeltaRotation);
+
+	//TODO: This has a problem where holding input buttons on more than 1 axis produces faster acceleration, how to fix?
+	const FVector XYMovement = FVector(CurrForwardSpeed * DeltaSeconds, CurrRightSpeed * DeltaSeconds, 0.f).GetClampedToMaxSize(MaxSpeed * DeltaSeconds);
 
 	// If non-zero size, move this actor
 	if (XYMovement.SizeSquared() > 0.0f)
@@ -151,6 +255,8 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 
 		if (Hit.IsValidBlockingHit())
 		{
+			//DEBUGMESSAGE("WE HIT A WALL AT %f", FColor::White, UGameplayStatics::GetRealTimeSeconds(GetWorld()));
+
 			const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
 			const FVector Deflection = FVector::VectorPlaneProject(XYMovement, Normal2D) * (1.f - Hit.Time);
 			RootComponent->MoveComponent(Deflection, NewRotation, true);
@@ -163,11 +269,18 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	}
 
 	// Handle lift movement
-	const float UpValue = GetInputAxisValue(LiftUpBinding);
+	/*const float UpValue = GetInputAxisValue(LiftUpBinding);
 	const FVector ZMoveDirection = FVector(0, 0, UpValue).GetClampedToMaxSize(1.0f);
-	const FVector ZMovement = ZMoveDirection * MoveSpeed * DeltaSeconds;
+	const FVector ZMovement = ZMoveDirection * 1000.f * DeltaSeconds;*/
 
-	if (ZMovement.SizeSquared() > 0.0f)
+	const FVector ZMoveDirection = FVector::UpVector;
+	const FVector ZMovement = ZMoveDirection * CurrentLiftSpeed * DeltaSeconds;
+
+	//DEBUGMESSAGE("CurrentLiftSpeed: %f", FColor::Red, CurrentLiftSpeed);
+
+	DEBUGMESSAGE("Location Z: %f", FColor::White, CurrentLocation.Z);
+
+	if (!ZMovement.IsNearlyZero(0.1f))//.SizeSquared() > 0.0f)// && !(CurrentLocation.Z + ZMovement.Z <= 207.f))
 	{
 		FHitResult Hit(1.f);
 
@@ -177,6 +290,8 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 
 		if (Hit.IsValidBlockingHit())
 		{
+			//DEBUGMESSAGE("WE HIT A FLOOR/CEILING AT %f", FColor::White, UGameplayStatics::GetRealTimeSeconds(GetWorld()));
+
 			const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
 			const FVector Deflection = FVector::VectorPlaneProject(ZMovement, Normal2D) * (1.f - Hit.Time);
 			RootComponent->MoveComponent(Deflection, CurrentRotation, true);
@@ -195,6 +310,7 @@ void AAfterCurfewPawn::Tick(float DeltaSeconds)
 	{
 		FireShot(FireDirection);
 	}
+	Super::Tick(DeltaSeconds);
 }
 
 void AAfterCurfewPawn::FireShot(FVector FireDirection)
